@@ -1,3 +1,4 @@
+import streamlit as st
 import requests
 
 RAPIDAPI_KEY = "717efc6d4cmsh0b0eac96e27f6e8p170b9ajsnb5ed8a08c301"
@@ -26,7 +27,7 @@ def get_property_comps(address, citystatezip):
 
         return comps
     else:
-        print(f"API Error: {response.status_code} - {response.text}")
+        st.error(f"API Error: {response.status_code} - {response.text}")
         return []
 
 def calculate_arv(comps):
@@ -36,26 +37,31 @@ def calculate_arv(comps):
 def calculate_mao(arv, repair_costs=0):
     return (arv * 0.6) - repair_costs
 
-def run_real_comps(address, citystatezip, repair_costs=0):
-    comps = get_property_comps(address, citystatezip)
+# Streamlit UI
+st.title("🏘️ Real Estate Comps & MAO Calculator")
 
-    if not comps:
-        print("❌ No comps found.")
-        return
+with st.form("comp_form"):
+    address = st.text_input("Property Address (e.g. 123 Main St)")
+    citystatezip = st.text_input("City/State/Zip (e.g. Saint Petersburg, FL)")
+    repair_costs = st.number_input("Estimated Repair Costs", min_value=0, value=0, step=1000)
+    submitted = st.form_submit_button("Run Comps")
 
-    arv = calculate_arv(comps)
-    mao = calculate_mao(arv, repair_costs)
+if submitted:
+    if address and citystatezip:
+        with st.spinner("Fetching comps..."):
+            comps = get_property_comps(address, citystatezip)
+        
+        if comps:
+            st.subheader("📍 Comparable Sold Properties")
+            for comp in comps:
+                st.write(f"- {comp['address']}: ${comp['price']:,}")
 
-    print("\n✅ Nearby Sold Comps:")
-    for comp in comps:
-        print(f"- {comp['address']}: ${comp['price']:,}")
+            arv = calculate_arv(comps)
+            mao = calculate_mao(arv, repair_costs)
 
-    print(f"\n💰 ARV: ${arv:,.2f}")
-    print(f"🏷️ MAO (60% Rule): ${mao:,.2f}")
-
-# Example usage
-if __name__ == "__main__":
-    address = input("Enter property address (e.g., 123 Main St): ")
-    citystatezip = input("Enter city/state/zip (e.g., Saint Petersburg, FL): ")
-    repair_costs = float(input("Enter estimated repair costs (optional): ") or 0)
-    run_real_comps(address, citystatezip, repair_costs)
+            st.markdown(f"### 💰 Estimated ARV: `${arv:,.2f}`")
+            st.markdown(f"### 🏷️ Maximum Allowable Offer (60% Rule): `${mao:,.2f}`")
+        else:
+            st.warning("No sold comps found. Try a nearby ZIP or full city name.")
+    else:
+        st.error("Please enter both the address and city/state/zip.")
